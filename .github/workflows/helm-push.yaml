@@ -74,7 +74,7 @@ jobs:
           chartName=$(yq .name "${{ matrix.chartDir }}/Chart.yaml")
           chartVersion=$(yq .version "${{ matrix.chartDir }}/Chart.yaml")
           echo "chart_version=${chartVersion}" >> "$GITHUB_OUTPUT"
-          if $(helm pull "oci://${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.chartDir }}" --version $chartVersion); then
+          if helm pull "oci://${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.chartDir }}" --version "$chartVersion" >/dev/null 2>&1; then
             echo "bump=true" >> "$GITHUB_OUTPUT"
           fi
 
