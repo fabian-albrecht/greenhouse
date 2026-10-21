@@ -1,0 +1,143 @@
+# SPDX-FileCopyrightText: 2026 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Greenhouse ResourceGraphDefinition (kro).
+#
+# One-step, declarative install of the Greenhouse *bootstrap* charts (manager +
+# idproxy). It replaces the historical two-pass `helm install` of the umbrella
+# chart: kro resolves the resource graph and ordering, and each component is
+# rolled out via Flux (OCIRepository + HelmRelease) pointing at the per-chart OCI
+# artifacts published from this repo.
+#
+# Optional, post-bootstrap components (dashboard, cors-proxy, authz, demo) are NOT
+# part of this graph — they are delivered as Greenhouse (Cluster)Plugins from the
+# default catalog once the platform is up. See deploy/kro/README.md.
+#
+# Prerequisites (NOT provisioned here): the kro controller, Flux
+# (source-controller + helm-controller), and cert-manager must already be
+# installed in the target cluster.
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: greenhouse
+spec:
+  schema:
+    apiVersion: v1alpha1
+    kind: Greenhouse
+    spec:
+      # Base DNS domain under which Greenhouse services are exposed (required).
+      dnsDomain: string | required=true
+      # Namespace the platform is installed into.
+      namespace: string | default="greenhouse"
+      # Chart versions (OCI tags) to roll out.
+      versions:
+        manager: string | default="0.16.0"
+        idproxy: string | default="0.13.0"
+      # OCI registry holding the published charts.
+      registry: string | default="oci://ghcr.io/cloudoperators/greenhouse/charts"
+      # High-level platform selector. Derives sensible defaults for the
+      # exposure/dns/cert axes across all components.
+      platform: string | enum="generic,gardener" default="generic"
+      # Per-axis overrides. When unset, values are derived from `platform`.
+      # (Charts own the actual templating of these axes; the RGD only selects.)
+      exposure: string | enum="ingress,gateway" default=""
+      dnsProvider: string | enum="disco,external-dns,gardener,none" default=""
+      # OIDC configuration for login (idproxy / dashboard).
+      oidc:
+        issuer: string | default=""
+        redirectURL: string | default=""
+        clientID: string | default=""
+        clientSecret: string | default=""
+      # Bootstrap-tier component toggles. Optional components come from the
+      # catalog as plugins, not from this graph.
+      components:
+        idproxy: boolean | default=true
+    status:
+      managerReady: ${manager.status.conditions}
+      idproxyReady: ${idproxy.status.conditions}
+
+  resources:
+    # --- manager: the operator + CRDs + webhooks. Everything depends on this. ---
+    - id: managerRepo
+      template:
+        apiVersion: source.toolkit.fluxcd.io/v1
+        kind: OCIRepository
+        metadata:
+          name: greenhouse-manager
+          namespace: ${schema.spec.namespace}
+        spec:
+          interval: 10m
+          url: ${schema.spec.registry}/manager
+          ref:
+            tag: ${schema.spec.versions.manager}
+
+    - id: manager
+      template:
+        apiVersion: helm.toolkit.fluxcd.io/v2
+        kind: HelmRelease
+        metadata:
+          name: greenhouse-manager
+          namespace: ${schema.spec.namespace}
+        spec:
+          interval: 10m
+          releaseName: greenhouse
+          chartRef:
+            kind: OCIRepository
+            name: ${managerRepo.metadata.name}
+          values:
+            global:
+              dnsDomain: ${schema.spec.dnsDomain}
+
+    # --- idproxy: OIDC login. Bootstrap-tier (platform unreachable without it). ---
+    - id: idproxyRepo
+      includeWhen:
+        - ${schema.spec.components.idproxy}
+      template:
+        apiVersion: source.toolkit.fluxcd.io/v1
+        kind: OCIRepository
+        metadata:
+          name: greenhouse-idproxy
+          namespace: ${schema.spec.namespace}
+        spec:
+          interval: 10m
+          url: ${schema.spec.registry}/idproxy
+          ref:
+            tag: ${schema.spec.versions.idproxy}
+
+    - id: idproxy
+      includeWhen:
+        - ${schema.spec.components.idproxy}
+      # dependsOn manager: idproxy is only rolled out once the operator +
+      # Greenhouse API are served (the chartRef reference also orders the graph).
+      template:
+        apiVersion: helm.toolkit.fluxcd.io/v2
+        kind: HelmRelease
+        metadata:
+          name: greenhouse-idproxy
+          namespace: ${schema.spec.namespace}
+        spec:
+          interval: 10m
+          dependsOn:
+            - name: ${manager.metadata.name}
+          releaseName: greenhouse-idproxy
+          chartRef:
+            kind: OCIRepository
+            name: ${idproxyRepo.metadata.name}
+          values:
+            global:
+              dnsDomain: ${schema.spec.dnsDomain}
+            oidc:
+              issuer: ${schema.spec.oidc.issuer}
+              redirectURL: ${schema.spec.oidc.redirectURL}
+              clientID: ${schema.spec.oidc.clientID}
+              clientSecret: ${schema.spec.oidc.clientSecret}
+            # Exposure/DNS/platform axes: charts implement the templating; the
+            # RGD only selects a value — `platform` default with per-axis override.
+            exposure:
+              mode: >-
+                ${schema.spec.exposure != "" ? schema.spec.exposure : "ingress"}
+            dns:
+              provider: >-
+                ${schema.spec.dnsProvider != "" ? schema.spec.dnsProvider :
+                  (schema.spec.platform == "gardener" ? "gardener" : "disco")}
+            platform: ${schema.spec.platform}

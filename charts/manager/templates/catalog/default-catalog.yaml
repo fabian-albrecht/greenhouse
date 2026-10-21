@@ -1,0 +1,14 @@
+{{- if .Values.defaultCatalog.enabled }}
+apiVersion: greenhouse.sap/v1alpha1
+kind: Catalog
+metadata:
+  name: {{ .Values.defaultCatalog.name }}
+  namespace: {{ .Values.defaultCatalog.namespace | default .Release.Namespace }}
+spec:
+  sources:
+    - repository: {{ .Values.defaultCatalog.repository | quote }}
+      ref:
+        {{- toYaml .Values.defaultCatalog.ref | nindent 8 }}
+      resources:
+        {{- toYaml .Values.defaultCatalog.resources | nindent 8 }}
+{{- end }}

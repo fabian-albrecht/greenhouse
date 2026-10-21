@@ -15,16 +15,41 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  # Discover every chart directory under charts/ (any dir containing a Chart.yaml)
+  # and emit a JSON matrix so new/renamed/removed charts are picked up automatically
+  # instead of being hardcoded.
+  generate-matrix:
+    runs-on: [ ubuntu-latest ]
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+            fetch-depth: 0
+            token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Discover charts
+        id: discover
+        run: |
+          # Find all Chart.yaml files directly under charts/<name>/ and build a
+          # [{chartDir, chartName}, ...] matrix from them.
+          matrix=$(find charts -mindepth 2 -maxdepth 2 -name Chart.yaml -printf '%h\n' \
+            | sort \
+            | while read -r dir; do
+                name=$(yq .name "$dir/Chart.yaml")
+                jq -nc --arg d "$dir" --arg n "$name" '{chartDir:$d, chartName:$n}'
+              done \
+            | jq -sc '.')
+          echo "Discovered charts: $matrix"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+
   helm-release:
+    needs: generate-matrix
     runs-on: [ ubuntu-latest ]
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - chartDir: charts/greenhouse
-            chartName: greenhouse
-          - chartDir: charts/dashboard
-            chartName: dashboard
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -74,7 +99,9 @@ jobs:
           chartName=$(yq .name "${{ matrix.chartDir }}/Chart.yaml")
           chartVersion=$(yq .version "${{ matrix.chartDir }}/Chart.yaml")
           echo "chart_version=${chartVersion}" >> "$GITHUB_OUTPUT"
-          if helm pull "oci://${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.chartDir }}" --version "$chartVersion" >/dev/null 2>&1; then
+          # Existence check uses the chart NAME at the same path we push to
+          # (oci://<registry>/<repo>/charts/<chartName>), not the directory path.
+          if $(helm pull "oci://${{ env.REGISTRY }}/${{ github.repository }}/charts/${chartName}" --version $chartVersion); then
             echo "bump=true" >> "$GITHUB_OUTPUT"
           fi
 
