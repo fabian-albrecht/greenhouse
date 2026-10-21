@@ -1,8 +1,9 @@
-{{/* 
+{{/*
 SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
 SPDX-License-Identifier: Apache-2.0
 */}}
 
+{{- if eq .Values.exposure.mode "ingress" -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -40,3 +41,4 @@ spec:
         - "{{ include "dashboard.hostname" $ }}"
         - "*.{{ include "dashboard.hostname" $ }}"
       secretName: "tls-{{ .Release.Name }}-dashboard"
+{{- end }}

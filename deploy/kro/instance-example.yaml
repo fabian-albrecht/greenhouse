@@ -1,0 +1,25 @@
+# SPDX-FileCopyrightText: 2026 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Example Greenhouse instance for the kro ResourceGraphDefinition in rgd.yaml.
+# Applying this (with the RGD installed) rolls out the bootstrap charts in order.
+apiVersion: kro.run/v1alpha1
+kind: Greenhouse
+metadata:
+  name: greenhouse
+  namespace: greenhouse
+spec:
+  dnsDomain: greenhouse.example.com
+  namespace: greenhouse
+  # Pick the target platform; this derives exposure/dns/cert defaults.
+  platform: gardener
+  # Optional per-axis overrides (uncomment to override the platform defaults):
+  # exposure: gateway
+  # dnsProvider: external-dns
+  oidc:
+    issuer: https://auth.example.com
+    redirectURL: https://greenhouse.example.com/auth/callback
+    clientID: greenhouse
+    clientSecret: change-me
+  components:
+    idproxy: true

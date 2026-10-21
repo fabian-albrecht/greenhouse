@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# ct install variant: exercise Gateway API (HTTPRoute) exposure mode.
+global:
+  dnsDomain: example.com
+  dex:
+    backend: postgres
+    postgresql:
+      postgresqlDatabase: dex
+      postgresqlPort: 5432
+      postgresqlUsername: dex
+
+exposure:
+  mode: gateway
+dns:
+  provider: external-dns
+gateway:
+  parentRefName: greenhouse-gateway
+  parentRefNamespace: greenhouse
+
+corsAllowedOrigins:
+  - "*"
+  - "foo"
+
+clients:
+- id: "greenhouse-ui"
+  name: "Greenhouse UI"
+  public: true
+  redirectURIs:
+    - https://dashboard.example.com

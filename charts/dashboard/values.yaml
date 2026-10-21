@@ -13,8 +13,31 @@ image:
 
 replicas: 2
 
+# Exposure mode: how Greenhouse exposes the dashboard.
+#   ingress -> render a Kubernetes Ingress (default, unchanged behavior)
+#   gateway -> render a Gateway API HTTPRoute instead
+exposure:
+  mode: ingress
+
+# DNS provider selects which DNS-automation annotations are placed on the
+# exposure resource. Defaults to the SAP "disco" controller behavior supplied
+# via ingress.annotations.
+#   disco | external-dns | gardener | none
+dns:
+  provider: disco
+
+# Deployment platform. Selects cert handling (tls-acme vs gardener cert-service).
+#   generic | gardener
+platform: generic
+
 ingress:
   className: nginx
+
+# Gateway API settings, used when exposure.mode == "gateway".
+gateway:
+  parentRefName: ""
+  parentRefNamespace: ""
+  sectionName: ""
 
 dashboard:
   assetServerURL: origin
@@ -22,3 +45,8 @@ dashboard:
   # The user for demonstration purposes.
   demoUser:
     token: demo
+
+# Bundled cors-proxy subchart. Enabled by default; the dashboard needs a CORS
+# proxy in front of the Kubernetes API. Set to false to supply your own.
+cors-proxy:
+  enabled: true

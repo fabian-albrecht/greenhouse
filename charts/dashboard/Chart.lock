@@ -1,0 +1,6 @@
+dependencies:
+- name: cors-proxy
+  repository: file://../cors-proxy
+  version: 0.12.0
+digest: sha256:0f6c22b9c2dbbf14adbcc42dc6572210512a5f7b7d48985ed2cc7003aacbdd02
+generated: "2026-10-19T13:26:23.223013+02:00"
