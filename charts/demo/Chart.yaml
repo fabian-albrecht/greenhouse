@@ -1,8 +1,0 @@
-# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
-# SPDX-License-Identifier: Apache-2.0
-
-apiVersion: v2
-name: demo
-description: Helm chart for the Greenhouse demo setup.
-type: application
-version: 0.1.4

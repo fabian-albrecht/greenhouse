@@ -1,7 +1,0 @@
-{
-  "kind": "Project",
-  "metadata": {
-    "name": "greenhouse"
-  },
-  "spec": { "display": { "name": "greenhouse" } }
-}
