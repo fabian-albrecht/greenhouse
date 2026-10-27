@@ -60,11 +60,24 @@ service:
 
 dnsEntry:
   # -- Enable DNSEntry resource. Set to true when using Gardener shoot-dns-service to register a DNS record for the webhook.
+  # Also auto-enabled when `dns.provider` is set to `gardener`.
   enabled: false
   # -- DNS name to register. Required when `dnsEntry.enabled` is true.
   dnsName: ""
   # -- Annotations to add to the DNSEntry. Set `dns.gardener.cloud/class: garden` to enable shoot-dns-service processing.
   annotations: {}
+
+# DNS provider selects the DNS-automation mechanism. `gardener` auto-enables the
+# DNSEntry resource above (equivalent to dnsEntry.enabled=true). Defaults keep
+# the current behavior (opt-in DNSEntry via dnsEntry.enabled).
+#   disco | external-dns | gardener | none
+dns:
+  provider: none
+
+# Deployment platform. `gardener` aligns with the Gardener shoot-dns-service /
+# cert-service conventions.
+#   generic | gardener
+platform: generic
 
 tls:
   # -- Enable TLS serving certs. Set to false for local debugging outside the cluster.
