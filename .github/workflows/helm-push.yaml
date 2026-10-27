@@ -1,11 +1,7 @@
 name: Package Helm Chart and publish to GitHub Packages
 
 on:
-  push:
-    tags:
-      - "helm-chart-*.*.*"
-    paths:
-        - 'charts/**'
+  workflow_dispatch:
 
 permissions:
   contents: write
