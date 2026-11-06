@@ -24,7 +24,9 @@ fi
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 NAMESPACE=greenhouse
 KUSTOMIZE_DIR=config/default
-HELM_DIR=charts/greenhouse
+# The umbrella chart has been retired; install the manager (operator) chart.
+# idproxy and optional components are installed separately / via the catalog.
+HELM_DIR=charts/manager
 _spacer=$(printf -- '#%.0s' {1..100})
 
 # Start the installation.
@@ -51,8 +53,7 @@ helm upgrade greenhouse "${REPO_ROOT}/${HELM_DIR}" \
   --namespace greenhouse \
   --reset-values \
   --install \
-  --set ccloud.enabled=false \
-  --set-string image.tag=latest --set-string idproxy.image.tag=latest --set-string cors-proxy.image.tag=latest
+  --set-string controllerManager.image.tag=latest
   # TODO: Handle additional values files.
 
 # Configure ServiceAccount-based auth for CI.

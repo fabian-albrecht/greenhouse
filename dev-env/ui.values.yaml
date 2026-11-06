@@ -19,3 +19,9 @@ dashboard:
   assetServerURL: origin
   demoUser:
     token: demo
+
+# The dev setup deploys charts/cors-proxy standalone (see dev-env/ui.config.yaml),
+# so disable the dashboard's bundled cors-proxy subchart to avoid deploying it
+# twice into the same release/namespace.
+cors-proxy:
+  enabled: false

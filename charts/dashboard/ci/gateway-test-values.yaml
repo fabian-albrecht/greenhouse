@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# ct install variant: exercise Gateway API (HTTPRoute) exposure mode.
+global:
+  dnsDomain: greenhouse.tld
+  oidc:
+    clientID: topSecret!
+
+image:
+  tag: ""
+  digest: "sha256@testing"
+
+exposure:
+  mode: gateway
+dns:
+  provider: external-dns
+gateway:
+  parentRefName: greenhouse-gateway
+  parentRefNamespace: greenhouse

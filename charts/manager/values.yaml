@@ -6,6 +6,29 @@ nameOverride: greenhouse
 alerts:
   enabled: true
 
+# Perses dashboards for the Greenhouse control plane. When enabled, the chart
+# ships the dashboard JSON files (perses-dashboards/) as labeled ConfigMaps for
+# the Perses operator to pick up. (Relocated from the retired umbrella chart.)
+perses:
+  enabled: true
+
+# Default plugin catalog. When enabled, the manager chart ships a Catalog CR
+# pointing at the Greenhouse extensions repository, making it the default plugin
+# source so optional components (dashboard, cors-proxy, authz, demo, …) and
+# community plugins can be installed as (Cluster)Plugins without applying a
+# catalog manually. Disable or override to point at a different source.
+defaultCatalog:
+  enabled: true
+  name: greenhouse-extensions
+  # Namespace the Catalog is created in (defaults to the release namespace).
+  namespace: ""
+  repository: https://github.com/cloudoperators/greenhouse-extensions
+  ref:
+    branch: main
+  # PluginDefinition paths (globs allowed) to import from the repository.
+  resources:
+    - "*/plugindefinition.yaml"
+
 controllerManager:
   containerSecurityContext:
     allowPrivilegeEscalation: false

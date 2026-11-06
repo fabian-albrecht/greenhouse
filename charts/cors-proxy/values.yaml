@@ -45,6 +45,22 @@ service:
   type: ClusterIP
   port: 80
 
+# Exposure mode for the service: how Greenhouse exposes this component.
+#   ingress -> render a Kubernetes Ingress (default, unchanged behavior)
+#   gateway -> render a Gateway API HTTPRoute instead
+exposure:
+  mode: ingress
+
+# DNS provider selects which DNS-automation annotations are placed on the
+# exposure resource. Defaults to the SAP "disco" controller (current behavior).
+#   disco | external-dns | gardener | none
+dns:
+  provider: disco
+
+# Deployment platform. Selects cert handling (tls-acme vs gardener cert-service).
+#   generic | gardener
+platform: generic
+
 ingress:
   enabled: true
   className: "nginx"
@@ -52,6 +68,14 @@ ingress:
     disco: "true"
     kubernetes.io/tls-acme: "true"
   tls: true
+
+# Gateway API settings, used when exposure.mode == "gateway".
+gateway:
+  # Name/namespace of the parent Gateway to attach the HTTPRoute to.
+  parentRefName: ""
+  parentRefNamespace: ""
+  # Gateway listener section name (optional).
+  sectionName: ""
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious

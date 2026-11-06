@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2026 SAP SE or an SAP affiliate company and Greenhouse c
 SPDX-License-Identifier: Apache-2.0
 */}}
 
-{{- if .Values.dnsEntry.enabled }}
+{{- if or .Values.dnsEntry.enabled (eq (.Values.dns).provider "gardener") }}
 {{- if not .Values.service.clusterIP }}
 {{- fail "dnsEntry.enabled requires service.clusterIP to be set as the DNSEntry target" }}
 {{- end }}
