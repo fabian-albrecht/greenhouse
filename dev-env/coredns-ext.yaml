@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# A second CoreDNS instance (separate from the cluster's built-in one) that
+# serves the install.greenhouse zone by reading records from etcd-dns.
+# external-dns (coredns provider) writes SkyDNS-format records into etcd;
+# this CoreDNS picks them up and answers DNS queries for *.install.greenhouse.
+#
+# Exposed as a NodePort so macOS /etc/resolver/install.greenhouse can point at
+# 127.0.0.1:<nodePort> to resolve all *.install.greenhouse names locally.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-ext
+  namespace: greenhouse
+data:
+  Corefile: |
+    install.greenhouse:53 {
+        etcd install.greenhouse {
+            stubzones
+            path /skydns
+            endpoint http://etcd-dns:2379
+        }
+        cache 30
+        log
+        errors
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredns-ext
+  namespace: greenhouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: coredns-ext
+  template:
+    metadata:
+      labels:
+        app: coredns-ext
+    spec:
+      containers:
+        - name: coredns
+          image: coredns/coredns:1.12.0
+          args: ["-conf", "/etc/coredns/Corefile"]
+          ports:
+            - containerPort: 53
+              name: dns-udp
+              protocol: UDP
+            - containerPort: 53
+              name: dns-tcp
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/coredns
+      volumes:
+        - name: config
+          configMap:
+            name: coredns-ext
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coredns-ext
+  namespace: greenhouse
+spec:
+  selector:
+    app: coredns-ext
+  type: NodePort
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: 53
+      protocol: UDP
+      nodePort: 30053
+    - name: dns-tcp
+      port: 53
+      targetPort: 53
+      protocol: TCP
+      nodePort: 30053

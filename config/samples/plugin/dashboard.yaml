@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: Plugin
+metadata:
+  name: dashboard
+  namespace: greenhouse
+spec:
+  pluginDefinitionRef:
+    kind: ClusterPluginDefinition
+    name: dashboard
+  optionValues:
+    - name: global.dnsDomain
+      value: install.greenhouse
+    - name: global.oidc.clientID
+      value: acc76122-55ae-43f3-86e7-c00c9fa6c8c4
+    - name: dns.provider
+      value: external-dns
+    - name: replicas
+      value: 1
+    - name: image.digest
+      value: sha256:5521fcb43c904411921edd99cd43a140619d64894bca9f4dccadc3240b6fd0ff
+    - name: ingress.annotations
+      value:
+        cert-manager.io/cluster-issuer: greenhouse-ca
+        external-dns.kubernetes.io/hostname: dashboard.install.greenhouse
+    # The dashboard includes a merged cors-proxy. Enable it here and configure
+    # it via corsProxy.* values (the dashboard chart's corsProxy subtree).
+    - name: corsProxy.enabled
+      value: true
+    - name: corsProxy.replicaCount
+      value: 1
+    - name: corsProxy.ingress.annotations
+      value:
+        cert-manager.io/cluster-issuer: greenhouse-ca
+        external-dns.kubernetes.io/hostname: api.install.greenhouse
+    # Only used if cors-proxy is switched to gateway mode
+    # (corsProxy.gateway.enabled=true). cert-manager's gateway-shim issues the
+    # ListenerSet TLS cert from this annotation, same as the ingress path above.
+    - name: corsProxy.gateway.listenerSetAnnotations
+      value:
+        cert-manager.io/cluster-issuer: greenhouse-ca
+    # external-dns reads the cors-proxy hostname from this HTTPRoute annotation
+    # in gateway mode (released external-dns.kubernetes.io/ prefix).
+    - name: corsProxy.gateway.httpRouteAnnotations
+      value:
+        external-dns.kubernetes.io/hostname: api.install.greenhouse

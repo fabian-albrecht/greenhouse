@@ -191,7 +191,10 @@ HELM_DOCS ?= $(LOCALBIN)/helm-docs
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= 5.8.1
-CERT_MANAGER_VERSION ?= v1.17.1
+CERT_MANAGER_VERSION ?= v1.20.1
+METALLB_VERSION ?= v0.14.9
+INGRESS_NGINX_VERSION ?= 4.11.3
+EXTERNAL_DNS_VERSION ?= 1.15.0
 CONTROLLER_TOOLS_VERSION ?= 0.21.0
 GOLINT_VERSION ?= 2.12.2
 GINKGOLINTER_VERSION ?= 0.23.0
@@ -298,6 +301,98 @@ E2E_RESULT_DIR ?= $(shell pwd)/bin
 # Include authz-related targets from hack/authz/authz.mk
 include hack/authz/authz.mk
 
+.PHONY: setup-install
+setup-install: cli ## Set up a local install-test environment with ingress-nginx, metallb, external-dns, and CoreDNS. Run 'make dns-mac' once afterwards to configure macOS DNS.
+	$(CLI) dev setup -f dev-env/install.config.yaml
+	@echo ""
+	@echo "API server: $$(kubectl config view --context=$(INSTALL_CONTEXT) --minify -o jsonpath='{.clusters[0].cluster.server}')"
+
+INSTALL_CONTEXT ?= kind-greenhouse-install
+INSTALL_DNS_DOMAIN ?= install.greenhouse
+INSTALL_ORG ?= greenhouse
+MANAGER_CHART_VERSION ?= 0.16.2
+
+.PHONY: install-greenhouse
+install-greenhouse: ## Install the Greenhouse manager chart (from OCI) into the greenhouse-install cluster, using a locally-built manager image.
+	docker build -t greenhouse/manager:local .
+	kind load docker-image greenhouse/manager:local --name greenhouse-install
+	helm upgrade --install greenhouse oci://ghcr.io/fabian-albrecht/greenhouse-helm/charts/manager \
+		--version $(MANAGER_CHART_VERSION) \
+		--kube-context $(INSTALL_CONTEXT) \
+		--namespace greenhouse --create-namespace \
+		--values dev-env/install.values.yaml \
+		--wait --timeout 5m
+
+.PHONY: install-catalog
+install-catalog: ## Install the greenhouse system org, greenhouse-extensions Catalog, and base Plugins (ingress-nginx, external-dns, idproxy, authz, dashboard (bundles cors-proxy), gateway-discovery-server) into the greenhouse-install cluster.
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/organization/greenhouse-install-oidc-secret.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/organization/greenhouse-install.yaml
+	kubectl wait organization greenhouse --context $(INSTALL_CONTEXT) --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=60s
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/catalog/greenhouse-extensions-catalog.yaml
+	kubectl wait catalog greenhouse-extensions --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=180s
+	kubectl wait plugindefinition ingress-nginx --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl wait plugindefinition external-dns --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl wait plugindefinition k8s-gateway-api --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl wait plugindefinition kgateway-crds --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl wait plugindefinition kgateway --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/ingress-nginx.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/external-dns.yaml
+	# Gateway API + kgateway must be installed (in order) before the central Gateway
+	# and the gateway-discovery-server can reconcile. Install CRDs first, then the
+	# kgateway controller (which creates the "kgateway" GatewayClass).
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/k8s-gateway-api.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/kgateway-crds.yaml
+	kubectl wait plugin k8s-gateway-api --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=180s
+	kubectl wait plugin kgateway-crds --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=180s
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/kgateway.yaml
+	kubectl wait plugin kgateway --context $(INSTALL_CONTEXT) -n greenhouse --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=300s
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/clusterplugindefiniton/idproxy.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/clusterplugindefiniton/dashboard.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/clusterplugindefiniton/authz.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/clusterplugindefiniton/gateway-discovery-server.yaml
+	kubectl wait clusterplugindefinition idproxy --context $(INSTALL_CONTEXT) --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl wait clusterplugindefinition dashboard --context $(INSTALL_CONTEXT) --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl wait clusterplugindefinition authz --context $(INSTALL_CONTEXT) --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl wait clusterplugindefinition gateway-discovery-server --context $(INSTALL_CONTEXT) --for=jsonpath='{.status.statusConditions.conditions[?(@.type=="Ready")].status}'=True --timeout=120s
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/idproxy.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/dashboard.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/authz.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f config/samples/plugin/gateway-discovery-server.yaml
+
+.PHONY: configure-oidc-apiserver
+configure-oidc-apiserver: ## (Local dev only) Configure the install cluster API server to trust idproxy as OIDC issuer.
+	@kubectl get secret greenhouse-ca -n cert-manager --context $(INSTALL_CONTEXT) -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/greenhouse-ca.crt
+	@yq eval --inplace '.jwt[0].issuer.url = "https://auth.$(INSTALL_DNS_DOMAIN)"' dev-env/oidc/authentication-config.yaml
+	@yq eval --inplace '.jwt[0].issuer.audiences[0] = "$(INSTALL_ORG)"' dev-env/oidc/authentication-config.yaml
+	@yq eval --inplace '.jwt[0].issuer.certificateAuthority = load_str("/tmp/greenhouse-ca.crt")' dev-env/oidc/authentication-config.yaml
+	@rm -f /tmp/greenhouse-ca.crt
+	@echo "Written dev-env/oidc/authentication-config.yaml — apiserver will hot-reload within seconds."
+
+.PHONY: trust-ca
+trust-ca: ## (Local dev only) Import the greenhouse CA cert into the macOS system keychain so all *.install.greenhouse endpoints are trusted.
+	kubectl get secret greenhouse-ca -n cert-manager --context $(INSTALL_CONTEXT) -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/greenhouse-ca.crt
+	-sudo security delete-certificate -c "greenhouse-install-ca" /Library/Keychains/System.keychain 2>/dev/null
+	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/greenhouse-ca.crt
+	@rm -f /tmp/greenhouse-ca.crt
+	@echo "CA cert imported — restart your browser to pick up the new trust."
+
+.PHONY: configure-mac
+configure-mac: dns-mac configure-oidc-apiserver trust-ca ## (Local dev only) Full Mac setup: DNS, API server OIDC config, import CA cert into macOS keychain.
+
+.PHONY: teardown-install
+teardown-install: ## Tear down the install-test environment (KinD cluster + Mac DNS config).
+	-kind delete cluster --name greenhouse-install
+	-rm -f $(LOCALBIN)/greenhouse-install.kubeconfig
+	@echo "Cleaning up macOS DNS config..."
+	-sudo rm -f /etc/resolver/install.greenhouse
+	-rm -f $(shell brew --prefix)/etc/dnsmasq.d/install.greenhouse.conf
+	-sudo brew services stop dnsmasq 2>/dev/null || brew services stop dnsmasq 2>/dev/null || true
+	-ifconfig lo0 | grep -q 127.0.0.2 && sudo ifconfig lo0 -alias 127.0.0.2 || true
+	-sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
+	@echo "Removing greenhouse CA cert from macOS keychain..."
+	-sudo security delete-certificate -c "greenhouse-install-ca" /Library/Keychains/System.keychain
+	@echo "Done. Re-run 'make setup-install && make dns-mac' to start fresh."
+
 .PHONY: setup
 setup: setup-manager setup-dashboard setup-demo
 
@@ -385,7 +480,18 @@ mockery:
 .PHONY: cert-manager
 cert-manager: kustomize
 	helm repo add jetstack https://charts.jetstack.io
-	helm upgrade --namespace greenhouse --version $(CERT_MANAGER_VERSION) --install cert-manager jetstack/cert-manager --set crds.enabled=true --create-namespace
+	# Gateway API cert-shim is on by default (>=1.15). ListenerSet support (alpha
+	# in 1.20) needs BOTH the ListenerSets feature gate (--feature-gates, via the
+	# top-level featureGates value) AND the --enable-gateway-api-listenerset flag
+	# (via extraArgs) — so cert-manager issues TLS certs for Gateway API
+	# ListenerSets annotated with cert-manager.io/cluster-issuer.
+	helm upgrade --namespace cert-manager --version $(CERT_MANAGER_VERSION) --install cert-manager jetstack/cert-manager \
+		--set crds.enabled=true \
+		--set featureGates="ListenerSets=true" \
+		--set "extraArgs={--enable-gateway-api,--enable-gateway-api-listenerset}" \
+		--create-namespace --wait --timeout 3m
+	kubectl apply --context $(INSTALL_CONTEXT) -f dev-env/selfsigned-issuer.yaml
+	kubectl apply --context $(INSTALL_CONTEXT) -f dev-env/ca-issuer.yaml
 
 .PHONY: flux
 flux: kustomize
@@ -403,7 +509,71 @@ zot:
 	# helm upgrade --namespace flux-system --version $(ZOT_VERSION) --install zot project-zot/zot -f dev-env/zot.values.yaml --create-namespace
 	bash hack/registry/setup.sh
 
-.PHONY: show-e2e-logs
+.PHONY: metallb
+metallb: ## Install metallb and configure an IP pool from the kind docker bridge subnet (172.18.0.200-210).
+	helm repo add metallb https://metallb.github.io/metallb
+	helm upgrade --install metallb metallb/metallb \
+		--namespace metallb-system --create-namespace \
+		--version $(METALLB_VERSION) \
+		--wait --timeout 3m
+	kubectl apply -f dev-env/metallb-pool.yaml
+
+.PHONY: ingress-nginx
+ingress-nginx: ## Install ingress-nginx as a LoadBalancer service (gets IP from metallb).
+	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+		--namespace ingress-nginx --create-namespace \
+		--version $(INGRESS_NGINX_VERSION) \
+		--set controller.service.type=LoadBalancer \
+		--wait --timeout 3m
+
+.PHONY: etcd-dns
+etcd-dns: ## Deploy a single-node etcd (quay.io/coreos/etcd) for the CoreDNS etcd plugin (external-dns backend).
+	kubectl apply -f dev-env/etcd-dns.yaml
+	kubectl rollout status deployment/etcd-dns -n greenhouse --timeout=3m
+
+.PHONY: coredns-ext
+coredns-ext: ## Install a second CoreDNS instance serving install.greenhouse via the etcd plugin (NodePort 30053 → host port 5354).
+	kubectl apply -f dev-env/coredns-ext.yaml
+	kubectl rollout status deployment/coredns-ext -n greenhouse --timeout=3m
+	@echo ""
+	@echo "CoreDNS is reachable on 127.0.0.1:5354 (via KinD extraPortMapping)"
+	@echo ""
+	@echo "Add DNS resolver for install.greenhouse on your Mac:"
+	@echo "  sudo mkdir -p /etc/resolver"
+	@echo "  printf 'nameserver 127.0.0.1\\nport 5354\\n' | sudo tee /etc/resolver/install.greenhouse"
+
+.PHONY: external-dns-local
+external-dns-local: ## Install external-dns with the coredns provider (writes to etcd-dns).
+	helm repo add external-dns https://kubernetes-sigs.github.io/external-dns
+	helm upgrade --install external-dns external-dns/external-dns \
+		--namespace greenhouse --create-namespace \
+		--version $(EXTERNAL_DNS_VERSION) \
+		--set provider.name=coredns \
+		--set "env[0].name=ETCD_URLS" \
+		--set "env[0].value=http://etcd-dns.greenhouse.svc.cluster.local:2379" \
+		--set "coredns.etcdEndpoints=http://etcd-dns.greenhouse.svc.cluster.local:2379" \
+		--set "domainFilters[0]=install.greenhouse" \
+		--set txtOwnerId=greenhouse-install \
+		--set policy=sync \
+		--set interval=10s \
+		--wait --timeout 3m
+
+.PHONY: dns-mac
+dns-mac: ## Configure *.install.greenhouse → 127.0.0.1 on macOS via dnsmasq on a loopback alias.
+	brew install dnsmasq
+	@printf 'address=/install.greenhouse/127.0.0.1\nlisten-address=127.0.0.2\nbind-interfaces\n' \
+		> $(shell brew --prefix)/etc/dnsmasq.d/install.greenhouse.conf
+	sudo ifconfig lo0 alias 127.0.0.2
+	sudo brew services restart dnsmasq
+	sudo mkdir -p /etc/resolver
+	@printf 'nameserver 127.0.0.2\n' | sudo tee /etc/resolver/install.greenhouse
+	sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
+	@echo ""
+	@echo "Done. *.install.greenhouse resolves to 127.0.0.1 on your Mac."
+	@echo "To verify what external-dns wrote to CoreDNS, bypass the resolver with:"
+	@echo "  dig @127.0.0.1 -p 5354 <hostname>.install.greenhouse +short"
+
 show-e2e-logs:
 	@for f in $(E2E_RESULT_DIR)/greenhouse-$(SCENARIO)-*.txt; do \
   		if [ -e "$$f" ]; then \

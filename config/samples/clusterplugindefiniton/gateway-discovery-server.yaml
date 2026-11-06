@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: ClusterPluginDefinition
+metadata:
+  name: gateway-discovery-server
+spec:
+  version: 0.2.0
+  displayName: Gateway Discovery Server
+  description: Exposes the Kubernetes API server OIDC discovery endpoints via the central Greenhouse Gateway
+  helmChart:
+    name: gateway-discovery-server
+    repository: oci://ghcr.io/fabian-albrecht/greenhouse-helm/charts
+    version: 0.2.0
+  options:
+    - name: global.dnsDomain
+      description: DNS domain used to construct the discovery hostname (discovery.<dnsDomain>)
+      required: true
+      type: string
+    - name: subDomain
+      description: Subdomain for the discovery endpoint hostname (combined with global.dnsDomain)
+      required: false
+      type: string
+      default: discovery
+    - name: hostname
+      description: Full hostname at which the discovery endpoints are exposed. Overrides subDomain. Defaults to discovery.<global.dnsDomain>.
+      required: false
+      type: string
+    - name: apiserverHostname
+      description: Hostname of the API server used as the static Backend target
+      required: false
+      type: string
+      default: kubernetes.default.svc
+    - name: gateway.parentRefName
+      description: Name of the central Gateway (deployed by the manager chart) to attach the ListenerSet to
+      required: false
+      type: string
+    - name: gateway.parentRefNamespace
+      description: Namespace of the central Gateway (defaults to the release namespace)
+      required: false
+      type: string
+    - name: tls.secretName
+      description: TLS certificate Secret name for the HTTPS listener. Defaults to <release>-tls.
+      required: false
+      type: string

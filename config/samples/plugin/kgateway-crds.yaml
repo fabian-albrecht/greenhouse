@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# kgateway CRDs (gateway.kgateway.dev — Backend, TrafficPolicy, …). Must be
+# installed before the kgateway controller Plugin.
+apiVersion: greenhouse.sap/v1alpha1
+kind: Plugin
+metadata:
+  name: kgateway-crds
+  namespace: greenhouse
+spec:
+  pluginDefinitionRef:
+    kind: PluginDefinition
+    name: kgateway-crds

@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Gateway API CRDs (gateway.networking.k8s.io). Must be installed before the
+# kgateway controller and before any Gateway/ListenerSet/HTTPRoute is created.
+apiVersion: greenhouse.sap/v1alpha1
+kind: Plugin
+metadata:
+  name: k8s-gateway-api
+  namespace: greenhouse
+spec:
+  pluginDefinitionRef:
+    kind: PluginDefinition
+    name: k8s-gateway-api

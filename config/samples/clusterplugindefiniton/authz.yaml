@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: ClusterPluginDefinition
+metadata:
+  name: authz
+spec:
+  version: 0.8.2
+  displayName: Authorization Server
+  description: Authorization webhook server for Greenhouse, enabling support-group-scoped access control via Kubernetes authorizer webhook.
+  helmChart:
+    name: authz
+    repository: oci://ghcr.io/fabian-albrecht/greenhouse-helm/charts
+    version: 0.8.2
+  options:
+    - name: replicaCount
+      description: Number of authz replicas
+      required: false
+      type: int
+      default: 1

@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: Plugin
+metadata:
+  name: idproxy
+  namespace: greenhouse
+spec:
+  pluginDefinitionRef:
+    kind: ClusterPluginDefinition
+    name: idproxy
+  optionValues:
+    - name: global.dnsDomain
+      value: install.greenhouse
+    - name: global.dex.backend
+      value: postgres
+    - name: global.dex.postgresql.postgresqlDatabase
+      value: dex
+    - name: global.dex.postgresql.postgresqlUsername
+      value: dex
+    - name: global.dex.postgresql.postgresqlSecretName
+      value: greenhouse-pguser-dex
+    - name: global.dex.postgresql.postgresqlHost
+      value: greenhouse-postgresql
+    - name: featureFlagsConfigMap
+      value: greenhouse-feature-flags
+    - name: dns.provider
+      value: external-dns
+    - name: replicaCount
+      value: 1
+    - name: ingress.annotations
+      value:
+        cert-manager.io/cluster-issuer: greenhouse-ca
+        external-dns.kubernetes.io/hostname: auth.install.greenhouse

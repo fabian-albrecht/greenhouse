@@ -118,5 +118,30 @@ Once the platform is up, the default catalog makes the
 `cloudoperators/greenhouse-extensions` PluginDefinitions available. Deploy the
 dashboard and other optional components as central-cluster Plugins (a `Plugin`
 with an empty `clusterName` targets the central cluster). The dashboard chart
-bundles its `cors-proxy`; disable it with `cors-proxy.enabled=false` if you
-provide your own.
+**bundles and enables its `cors-proxy` by default** (`cors-proxy.enabled=true`),
+so you no longer install cors-proxy separately — it ships as part of the
+dashboard's single Flux HelmRelease. Set `cors-proxy.enabled=false` on the
+dashboard Plugin only if you provide your own proxy or run cors-proxy in Gateway
+API mode.
+
+## Gateway mode (experimental, gated)
+
+The networking charts can expose their endpoints through the Gateway API instead
+of Kubernetes `Ingress`. This is **off by default** — nothing renders until all
+of the following are in place:
+
+1. Gateway API (`gateway.networking.k8s.io/v1`) and kgateway
+   (`gateway.kgateway.dev/v1alpha1`) CRDs plus a `GatewayClass` are installed.
+2. The `manager` chart has `gateway.enabled=true` and `gateway.className=<class>`
+   — this renders the central `greenhouse-gateway` resource that the component
+   charts attach to.
+3. The component Plugins flip to gateway mode and point at that Gateway:
+   - **dashboard** Plugin: `cors-proxy.gateway.enabled=true`,
+     `cors-proxy.gateway.parentRefName=greenhouse-gateway`.
+   - **gateway-discovery-server** Plugin: delivered separately; it exposes the
+     API-server OIDC discovery endpoints (`/.well-known/openid-configuration`,
+     `/openid/v1/jwks`) through the same Gateway via
+     `gateway.parentRefName=greenhouse-gateway`.
+
+All gateway templates are CRD capability-gated, so leaving mode disabled (or
+installing on a cluster without the CRDs) is a safe no-op.

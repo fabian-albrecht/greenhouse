@@ -58,3 +58,8 @@ gen-crd-api-reference-docs
 public
 .hugo_build.lock
 *.drawio.bkp
+# Local dev install cluster — generated files containing secrets/certs
+dev-env/oidc/authentication-config.yaml
+dev-env/authz/authorization-config.yaml
+dev-env/authz/authz-webhook.yaml
+config/samples/organization/greenhouse-install-oidc-secret.yaml

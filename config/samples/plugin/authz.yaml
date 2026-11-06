@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: Plugin
+metadata:
+  name: authz
+  namespace: greenhouse
+spec:
+  pluginDefinitionRef:
+    kind: ClusterPluginDefinition
+    name: authz
+  optionValues:
+    - name: replicaCount
+      value: 1
+    - name: tls.enabled
+      value: false
+    - name: service.type
+      value: LoadBalancer
+    - name: service.loadBalancerIP
+      value: 172.18.0.200
+    - name: service.annotations
+      value:
+        external-dns.kubernetes.io/hostname: authz.install.greenhouse

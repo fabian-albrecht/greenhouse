@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: Plugin
+metadata:
+  name: external-dns
+  namespace: greenhouse
+spec:
+  pluginDefinitionRef:
+    kind: PluginDefinition
+    name: external-dns
+  optionValues:
+    - name: externaldns.provider.name
+      value: coredns
+    - name: externaldns.env[0].name
+      value: ETCD_URLS
+    - name: externaldns.env[0].value
+      value: http://etcd-dns.greenhouse.svc.cluster.local:2379
+    - name: externaldns.coredns.etcdEndpoints
+      value: http://etcd-dns.greenhouse.svc.cluster.local:2379
+    - name: externaldns.domainFilters[0]
+      value: install.greenhouse
+    - name: externaldns.txtOwnerId
+      value: greenhouse-install
+    - name: externaldns.policy
+      value: sync
+    - name: externaldns.interval
+      value: 10s
+    # Annotation-only mode: external-dns ONLY processes resources that carry the
+    # external-dns.kubernetes.io/hostname annotation. Resources without it (even
+    # with spec.rules/spec.hostnames) are ignored entirely — so every resource
+    # that should get a DNS record MUST set this annotation.
+    - name: externaldns.annotationFilter
+      value: external-dns.kubernetes.io/hostname
+    # The chart's appVersion ships external-dns v0.21.0, which still defaults to
+    # the legacy external-dns.alpha.kubernetes.io/ annotation prefix. Pin v0.24.0
+    # (>=0.22.0) so the released external-dns.kubernetes.io/ prefix is the default.
+    - name: externaldns.image.tag
+      value: v0.24.0
+    # Watch Gateway API HTTPRoutes in addition to service/ingress. The gateway
+    # components (cors-proxy, gateway-discovery-server) set their hostname via the
+    # external-dns.kubernetes.io/hostname annotation on their HTTPRoute.
+    - name: externaldns.sources[0]
+      value: service
+    - name: externaldns.sources[1]
+      value: ingress
+    - name: externaldns.sources[2]
+      value: gateway-httproute
+    # Our HTTPRoutes attach to a ListenerSet (not the Gateway directly), so
+    # external-dns must follow the route -> ListenerSet -> Gateway chain to
+    # resolve the target address. Renders --gateway-listener-sets + RBAC.
+    - name: externaldns.enableGatewayListenerSets
+      value: true

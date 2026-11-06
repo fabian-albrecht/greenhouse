@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2025 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: greenhouse.sap/v1alpha1
+kind: Catalog
+metadata:
+  name: greenhouse-extensions
+  namespace: greenhouse
+spec:
+  sources:
+    - repository: https://github.com/cloudoperators/greenhouse-extensions
+      ref:
+        branch: main
+      resources:
+        - "*/plugindefinition.yaml"

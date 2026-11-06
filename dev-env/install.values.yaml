@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+global:
+  dnsDomain: install.greenhouse
+  dex:
+    backend: postgres
+  plugin:
+    ociMirroringEnabled: false
+  pluginPreset:
+    expressionEvaluationEnabled: true
+    integrationEnabled: true
+  workloadIdentity:
+    enabled: false
+# Central Gateway API resource for gateway-mode exposure. Enabled for the
+# install flow: the kgateway Plugin installs the controller + CRDs and creates
+# the "kgateway" GatewayClass; this renders the central greenhouse-gateway that
+# the cors-proxy (via the dashboard) and gateway-discovery-server attach to.
+gateway:
+  enabled: true
+  className: kgateway
+  allowedListenersFrom: Same
+alerts:
+  enabled: false
+perses:
+  enabled: false
+controllerManager:
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+  args: []
+  replicas: 1
+  serviceAccount:
+    annotations: {}
+  artifactStorage:
+    path: /tmp/data
+    sizeLimit: 128Mi
+  env: []
+  image:
+    repository: greenhouse/manager
+    tag: local
+postgresqlng:
+  enabled: true
+  global:
+    linkerd_enabled: false
+    region: greenhouse
+    registry: keppel.global.cloud.sap/ccloud
+  alerts:
+    enabled: false
+  persistence:
+    accessMode: ReadWriteOnce

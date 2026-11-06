@@ -1,0 +1,36 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: ClusterPluginDefinition
+metadata:
+  name: idproxy
+spec:
+  version: 0.14.2
+  displayName: ID Proxy
+  description: Dex-based OIDC identity proxy for Greenhouse
+  helmChart:
+    name: idproxy
+    repository: oci://ghcr.io/fabian-albrecht/greenhouse-helm/charts
+    version: 0.14.2
+  options:
+    - name: ingress.className
+      description: IngressClass to use for the idproxy ingress
+      required: false
+      type: string
+      default: nginx
+    - name: dns.provider
+      description: "DNS provider for ingress annotations: disco | external-dns | gardener | none"
+      required: false
+      type: string
+      default: external-dns
+    - name: platform
+      description: "Deployment platform for cert handling: generic | gardener"
+      required: false
+      type: string
+      default: generic
+    - name: replicaCount
+      description: Number of idproxy replicas
+      required: false
+      type: int
+      default: 1

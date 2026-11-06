@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Placeholder — overwritten by 'make configure-oidc-apiserver' after cert-manager is running.
+# The apiserver watches this file and hot-reloads it.
+apiVersion: apiserver.config.k8s.io/v1beta1
+kind: AuthenticationConfiguration
+jwt: []

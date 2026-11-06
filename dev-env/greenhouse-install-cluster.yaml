@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+nodes:
+  - role: control-plane
+    # Required for ingress-nginx to bind ports 80/443 on the host.
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
+      - containerPort: 30053
+        hostPort: 5354
+        protocol: UDP
+      - containerPort: 30053
+        hostPort: 5354
+        protocol: TCP
+    extraMounts:
+      - hostPath: ./dev-env/oidc
+        containerPath: /etc/kubernetes/oidc
+      - hostPath: ./dev-env/authz
+        containerPath: /etc/kubernetes/authz
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+          extraArgs:
+            "anonymous-auth": "true"
+            "service-account-issuer": "https://greenhouse-install-control-plane:6443"
+            "service-account-jwks-uri": "https://greenhouse-install-control-plane:6443/openid/v1/jwks"
+            "authentication-config": "/etc/kubernetes/oidc/authentication-config.yaml"
+            "authorization-config": "/etc/kubernetes/authz/authorization-config.yaml"
+          extraVolumes:
+            - name: oidc-config
+              hostPath: /etc/kubernetes/oidc
+              mountPath: /etc/kubernetes/oidc
+              readOnly: true
+              pathType: DirectoryOrCreate
+            - name: authz-config
+              hostPath: /etc/kubernetes/authz
+              mountPath: /etc/kubernetes/authz
+              readOnly: true
+              pathType: DirectoryOrCreate

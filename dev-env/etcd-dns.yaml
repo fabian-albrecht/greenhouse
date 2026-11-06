@@ -1,0 +1,54 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Single-node etcd used as the backend for the CoreDNS etcd plugin.
+# external-dns (coredns provider) writes SkyDNS records here;
+# CoreDNS (coredns-ext.yaml) reads them to serve the install.greenhouse zone.
+#
+# Uses the official quay.io/coreos/etcd image (no registry auth required).
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd-dns
+  namespace: greenhouse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etcd-dns
+  template:
+    metadata:
+      labels:
+        app: etcd-dns
+    spec:
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v3.5.14
+          command:
+            - etcd
+            - --listen-client-urls=http://0.0.0.0:2379
+            - --advertise-client-urls=http://etcd-dns.greenhouse.svc.cluster.local:2379
+            - --data-dir=/var/etcd/data
+          ports:
+            - containerPort: 2379
+              name: client
+          volumeMounts:
+            - name: data
+              mountPath: /var/etcd/data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd-dns
+  namespace: greenhouse
+spec:
+  selector:
+    app: etcd-dns
+  ports:
+    - name: client
+      port: 2379
+      targetPort: 2379

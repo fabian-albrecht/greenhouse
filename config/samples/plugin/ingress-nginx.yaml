@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: Plugin
+metadata:
+  name: ingress-nginx
+  namespace: greenhouse
+spec:
+  pluginDefinitionRef:
+    kind: PluginDefinition
+    name: ingress-nginx
+  optionValues:
+    - name: controller.service.type
+      value: NodePort
+    - name: controller.hostPort.enabled
+      value: true
+    - name: controller.kind
+      value: DaemonSet
+    - name: controller.ingressClassResource.default
+      value: true

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Greenhouse contributors
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: greenhouse.sap/v1alpha1
+kind: Plugin
+metadata:
+  name: gateway-discovery-server
+  namespace: greenhouse
+spec:
+  pluginDefinitionRef:
+    kind: ClusterPluginDefinition
+    name: gateway-discovery-server
+  optionValues:
+    - name: global.dnsDomain
+      value: install.greenhouse
+    # Attach to the central Gateway rendered by the manager chart
+    # (<manager.fullname>-gateway; manager sets nameOverride: greenhouse).
+    - name: gateway.parentRefName
+      value: greenhouse-gateway
+    # cert-manager's gateway-shim (enableGatewayAPI + ListenerSets feature gate,
+    # set in `make cert-manager`) watches this annotation on the ListenerSet and
+    # issues the TLS cert into the secret the listener references.
+    - name: listenerSetAnnotations
+      value:
+        cert-manager.io/cluster-issuer: greenhouse-ca
+    # external-dns reads the hostname from this annotation on the HTTPRoute
+    # (released external-dns.kubernetes.io/ prefix; requires external-dns >=0.22).
+    - name: httpRouteAnnotations
+      value:
+        external-dns.kubernetes.io/hostname: discovery.install.greenhouse
